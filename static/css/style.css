@@ -1,0 +1,69 @@
+/* style.css - Tema Dark Cyber Security v2.0 */
+body {
+    background-color: #0d1117; /* Fondo GitHub Dark */
+    color: #c9d1d9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* NAVBAR */
+.navbar {
+    background-color: #161b22 !important;
+    border-bottom: 1px solid #30363d;
+}
+
+.navbar-brand {
+    color: #238636 !important; /* Verde GitHub */
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* TARJETAS (CARDS) - CORRECCIÓN DE CONTRASTE */
+.card {
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    color: #e6edf3 !important; /* Fuerza color blanco/gris claro al texto */
+}
+
+.card-header {
+    background-color: #21262d;
+    border-bottom: 1px solid #30363d;
+    color: #58a6ff !important; /* Azul brillante para títulos */
+    font-weight: bold;
+}
+
+.card-body {
+    background-color: #0d1117; /* Un poco más oscuro para resaltar el contenido */
+    color: #c9d1d9 !important;
+}
+
+/* INPUTS Y FORMULARIOS */
+.form-control, .form-control:focus {
+    background-color: #0d1117;
+    border: 1px solid #30363d;
+    color: #fff !important; /* Texto blanco al escribir */
+}
+
+.form-control::placeholder {
+    color: #6e7681;
+}
+
+/* BOTONES */
+.btn-primary {
+    background-color: #238636;
+    border: none;
+}
+.btn-primary:hover {
+    background-color: #2ea043;
+}
+
+.btn-outline-danger {
+    color: #f85149;
+    border-color: #f85149;
+}
+.btn-outline-danger:hover {
+    background-color: #da3633;
+    color: #fff;
+}
+
+

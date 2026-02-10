@@ -21,3 +21,4 @@ Thumbs.db
 # Instaladores y carpetas accidentales
 *.exe
 Git/
+logs/*.log
