@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h2>🔐 Bóveda de {{ name }}</h2>
+    <span class="badge bg-success">Sistema Seguro Activo</span>
+</div>
+
+<div class="card bg-dark text-white border-secondary mb-5 shadow">
+    <div class="card-header border-secondary">➕ Nuevo Registro Seguro</div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <input type="text" name="title" class="form-control bg-secondary text-white border-0" placeholder="Título (ej. Clave Bancaria)" required>
+            </div>
+            <div class="mb-3">
+                <textarea name="content" class="form-control bg-secondary text-white border-0" rows="3" placeholder="Escribe tu información confidencial aquí..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">🔒 Encriptar y Guardar</button>
+        </form>
+    </div>
+</div>
+
+<h4 class="mb-3 border-bottom pb-2">Mis Archivos Clasificados</h4>
+
+<div class="row">
+    {% for secret in secrets %}
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 shadow-sm border-danger"> <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <strong class="text-danger">📂 {{ secret.title }}</strong>
+                <span class="badge bg-secondary">ID: {{ secret.id }}</span>
+            </div>
+            <div class="card-body">
+                <p class="card-text" style="font-family: monospace;">{{ secret.content }}</p>
+            </div>
+            <div class="card-footer bg-transparent border-top-0 text-end">
+                <form action="{{ url_for('delete_secret', id=secret.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de destruir este documento?');">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">🗑️ Destruir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center mt-5">
+        <h5 class="text-muted">La bóveda está vacía.</h5>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+
+
