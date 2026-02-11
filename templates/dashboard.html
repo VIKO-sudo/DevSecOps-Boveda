@@ -6,9 +6,20 @@
         <h2>🔐 Bóveda de {{ name }}</h2>
         <span class="badge bg-success">Sistema Seguro Activo</span>
     </div>
-    <button type="button" class="btn btn-outline-info shadow" data-bs-toggle="modal" data-bs-target="#exportModal">
-        ⬇️ Descargar Backup Seguro
-    </button>
+    
+    <div>
+        {% if not current_user.is_mfa_enabled %}
+            <a href="{{ url_for('setup_2fa') }}" class="btn btn-danger shadow me-2 fw-bold animate-pulse">
+                ⚠️ Activar 2FA
+            </a>
+        {% else %}
+            <span class="badge bg-info border border-info shadow me-2 p-2">🛡️ 2FA Activado</span>
+        {% endif %}
+        
+        <button type="button" class="btn btn-outline-info shadow" data-bs-toggle="modal" data-bs-target="#exportModal">
+            ⬇️ Descargar Backup Seguro
+        </button>
+    </div>
 </div>
 
 <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">

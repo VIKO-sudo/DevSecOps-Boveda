@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card bg-dark border-secondary shadow-lg text-center">
+            <div class="card-header border-secondary text-warning fw-bold">
+                🔒 Verificación en Dos Pasos
+            </div>
+            <div class="card-body text-white">
+                <p class="text-muted small mb-4">Abre tu aplicación de autenticación e ingresa el código temporal.</p>
+                
+                <form method="POST">
+                    <input type="text" name="token" class="form-control text-center fs-3 bg-dark text-white border-secondary mx-auto" style="letter-spacing: 10px;" maxlength="6" required autocomplete="off" autofocus placeholder="000000">
+                    <button type="submit" class="btn btn-warning mt-4 w-100 fw-bold">Verificar y Entrar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

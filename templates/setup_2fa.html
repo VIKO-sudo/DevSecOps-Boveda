@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card bg-dark border-secondary shadow-lg text-center">
+            <div class="card-header border-secondary text-info fw-bold">
+                🛡️ Configurar Autenticador (MFA)
+            </div>
+            <div class="card-body text-white">
+                <p class="text-muted small">Escanea este código QR usando Google Authenticator, Authy o Microsoft Authenticator.</p>
+                
+                <img src="data:image/png;base64,{{ qr_b64 }}" class="img-fluid border border-3 border-white rounded mb-3" style="max-width: 200px;">
+                
+                <p class="small text-muted mb-1">Si no puedes escanearlo, ingresa este código manualmente:</p>
+                <code class="fs-5 text-warning bg-black p-2 rounded">{{ secret }}</code>
+                
+                <hr class="border-secondary mt-4">
+                
+                <form method="POST" class="mt-3">
+                    <label class="form-label text-info">Ingresa el código de 6 dígitos para confirmar:</label>
+                    <input type="text" name="token" class="form-control text-center fs-3 letter-spacing-3 bg-dark text-white border-secondary mx-auto" style="max-width: 200px; letter-spacing: 10px;" maxlength="6" required autocomplete="off" autofocus>
+                    <button type="submit" class="btn btn-primary mt-4 w-100 fw-bold">Activar Protección MFA</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+

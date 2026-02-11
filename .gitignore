@@ -1,24 +1,11 @@
-# Entorno virtual
 venv/
-
-# Caché de Python
 __pycache__/
-*.pyc
-
-# Instancias / configs locales
 instance/
-
-# Bases de datos locales
 *.db
-
-# Variables de entorno
+logs/
 .env
-
-# Archivos del sistema
+*.enc
+*.zip
 .DS_Store
-Thumbs.db
 
-# Instaladores y carpetas accidentales
-*.exe
-Git/
-logs/*.log
+

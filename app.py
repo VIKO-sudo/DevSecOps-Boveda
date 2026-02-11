@@ -5,11 +5,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
+from flask import session
+import pyotp
+import qrcode
+import base64
 import os
 import logging
 import json
 import io
 import zipfile
+import re
+from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -62,6 +68,14 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(150), nullable=False)
     secrets = db.relationship('Secret', backref='owner', lazy=True)
+    
+    # --- NUEVO: Account Lockout ---
+    failed_logins = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    
+    # --- NUEVO: Preparación para 2FA/MFA ---
+    totp_secret = db.Column(db.String(32), nullable=True)
+    is_mfa_enabled = db.Column(db.Boolean, default=False)
 
 class Secret(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -71,7 +85,8 @@ class Secret(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    # Versión moderna de SQLAlchemy 2.0
+    return db.session.get(User, int(user_id))
 
 # --- RUTAS PRINCIPALES ---
 
@@ -86,8 +101,9 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if len(password) < 8:
-            flash('La contraseña debe tener al menos 8 caracteres.')
+        # VALIDACIÓN REGEX: Min 8 chars, 1 mayúscula, 1 minúscula, 1 número
+        if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$', password):
+            flash('La contraseña debe tener mínimo 8 caracteres, incluir una mayúscula, una minúscula y un número.')
             return redirect(url_for('register'))
 
         user = User.query.filter_by(username=username).first()
@@ -115,12 +131,46 @@ def login():
         
         user = User.query.filter_by(username=username).first()
         
-        if user and check_password_hash(user.password, password):
-            login_user(user)
-            logging.info(f'Inicio de sesión exitoso: {username}')
-            return redirect(url_for('dashboard'))
+        if user:
+            # 1. VERIFICAR SI LA CUENTA ESTÁ CONGELADA
+            if user.locked_until and user.locked_until > datetime.utcnow():
+                tiempo_restante = (user.locked_until - datetime.utcnow()).seconds // 60
+                flash(f'Cuenta bloqueada por seguridad. Intenta de nuevo en {tiempo_restante} minutos.')
+                logging.warning(f'Intento de acceso a cuenta bloqueada: {username}')
+                return redirect(url_for('login'))
+
+            # 2. VERIFICAR CONTRASEÑA
+            if check_password_hash(user.password, password):
+                user.failed_logins = 0
+                user.locked_until = None
+                db.session.commit()
+                
+                # --- NUEVO: INTERCEPTOR DE 2FA ---
+                if user.is_mfa_enabled:
+                    # Guardamos temporalmente su ID en la sesión, pero NO lo logueamos aún
+                    session['pending_user_id'] = user.id
+                    return redirect(url_for('login_2fa'))
+                
+                # Si no tiene 2FA, lo dejamos pasar directo
+                login_user(user)
+                logging.info(f'Inicio de sesión exitoso: {username}')
+                return redirect(url_for('dashboard'))
+        
+            else:
+                # Login Fallido: Sumamos 1 al contador de errores
+                user.failed_logins += 1
+                if user.failed_logins >= 5:
+                    # Al 5to error, bloqueamos la cuenta por 15 minutos
+                    user.locked_until = datetime.utcnow() + timedelta(minutes=5)
+                    logging.warning(f'CUENTA CONGELADA: {username} excedió intentos de contraseña.')
+                    flash('Demasiados intentos fallidos. Cuenta bloqueada por 5 minutos')
+                else:
+                    intentos_restantes = 5 - user.failed_logins
+                    logging.warning(f'Fallo de inicio de sesión para: {username}. Quedan {intentos_restantes} intentos.')
+                    flash(f'Usuario o contraseña incorrectos. Quedan {intentos_restantes} intentos.')
+                db.session.commit()
         else:
-            logging.warning(f'Fallo de inicio de sesión para: {username}')
+            # Si el usuario no existe, mensaje genérico (OpSec)
             flash('Usuario o contraseña incorrectos.')
             
     return render_template('login.html')
@@ -247,8 +297,72 @@ button{background:#238636;color:white;cursor:pointer;font-weight:bold;}button:ho
     memory_file.seek(0)
     return send_file(memory_file, as_attachment=True, download_name=f'Kit_Rescate_{current_user.username}.zip', mimetype='application/zip')
 
-@app.route('/logout')
+@app.route('/setup_2fa', methods=['GET', 'POST'])
 @login_required
+def setup_2fa():
+    if current_user.is_mfa_enabled:
+        flash('El Autenticador ya está activado en tu cuenta.')
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        token = request.form.get('token')
+        # Verificamos si el código que puso en su cel es correcto
+        totp = pyotp.TOTP(session.get('temp_totp_secret'))
+        if totp.verify(token):
+            current_user.totp_secret = session['temp_totp_secret']
+            current_user.is_mfa_enabled = True
+            db.session.commit()
+            session.pop('temp_totp_secret', None) # Limpiamos la memoria
+            flash('¡Autenticación de Dos Factores activada con éxito! Nivel de seguridad al máximo. 🛡️')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Código incorrecto. Asegúrate de leer bien los 6 dígitos.')
+    
+    # Si entra por primera vez (GET), le generamos un secreto único
+    if 'temp_totp_secret' not in session:
+        session['temp_totp_secret'] = pyotp.random_base32()
+    
+    secret = session['temp_totp_secret']
+    # Creamos el link estándar que entienden las apps de MFA
+    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.username, issuer_name="DevSecOps Vault")
+    
+    # Dibujamos el QR en la memoria RAM y lo convertimos a texto Base64 para enviarlo al HTML
+    import io
+    qr = qrcode.make(totp_uri)
+    buffered = io.BytesIO()
+    qr.save(buffered, format="PNG")
+    qr_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    
+    return render_template('setup_2fa.html', secret=secret, qr_b64=qr_base64)
+
+@app.route('/login_2fa', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def login_2fa():
+    if 'pending_user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        token = request.form.get('token')
+        # --- VERSIÓN CORREGIDA PARA SQLALCHEMY 2.0 ---
+        user = db.session.get(User, session['pending_user_id']) 
+        
+        totp = pyotp.TOTP(user.totp_secret)
+        # ... (el resto sigue igual)
+        
+        totp = pyotp.TOTP(user.totp_secret)
+        if totp.verify(token):
+            # El código es correcto. Lo logueamos de verdad.
+            session.pop('pending_user_id', None)
+            login_user(user)
+            logging.info(f'Inicio de sesión 2FA exitoso: {user.username}')
+            return redirect(url_for('dashboard'))
+        else:
+            logging.warning(f'Intento fallido de 2FA para usuario ID: {user.id}')
+            flash('Código 2FA incorrecto o expirado.')
+            
+    return render_template('login_2fa.html')
+@app.route('/logout')  # <--- ¡ESTA LÍNEA ES LA QUE TE FALTA!
+@login_required        # <--- Y ESTA TAMBIÉN (Para mayor seguridad)
 def logout():
     logout_user()
     flash('Has cerrado sesión.')
