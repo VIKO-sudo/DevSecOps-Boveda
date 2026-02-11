@@ -1,7 +1,7 @@
-/* style.css - Tema Dark Cyber Security v2.0 */
+/* style.css - Tema Dark Cyber Security v3.0 (Corrección de Contraste) */
 body {
     background-color: #0d1117; /* Fondo GitHub Dark */
-    color: #c9d1d9;
+    color: #c9d1d9; /* Texto base claro */
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -12,40 +12,51 @@ body {
 }
 
 .navbar-brand {
-    color: #238636 !important; /* Verde GitHub */
+    color: #238636 !important; /* Verde Hacker */
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 2px;
 }
 
-/* TARJETAS (CARDS) - CORRECCIÓN DE CONTRASTE */
+/* CORRECCIÓN DE TEXTO INVISIBLE (El problema principal) */
+.text-muted {
+    color: #aab2bb !important; /* Gris CLARO para que se lea sobre negro */
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+    color: #e6edf3; /* Asegura que los títulos sean blancos */
+}
+
+/* TARJETAS (CARDS) */
 .card {
     background-color: #161b22;
     border: 1px solid #30363d;
-    color: #e6edf3 !important; /* Fuerza color blanco/gris claro al texto */
 }
 
 .card-header {
     background-color: #21262d;
     border-bottom: 1px solid #30363d;
-    color: #58a6ff !important; /* Azul brillante para títulos */
+    color: #58a6ff !important; /* Azul Tech */
     font-weight: bold;
 }
 
 .card-body {
-    background-color: #0d1117; /* Un poco más oscuro para resaltar el contenido */
+    background-color: #0d1117;
     color: #c9d1d9 !important;
 }
 
 /* INPUTS Y FORMULARIOS */
-.form-control, .form-control:focus {
+.form-control {
     background-color: #0d1117;
     border: 1px solid #30363d;
-    color: #fff !important; /* Texto blanco al escribir */
+    color: #fff !important;
 }
 
-.form-control::placeholder {
-    color: #6e7681;
+.form-control:focus {
+    background-color: #0d1117;
+    border-color: #58a6ff;
+    color: #fff !important;
+    box-shadow: 0 0 5px rgba(88, 166, 255, 0.5);
 }
 
 /* BOTONES */
@@ -57,13 +68,35 @@ body {
     background-color: #2ea043;
 }
 
-.btn-outline-danger {
-    color: #f85149;
-    border-color: #f85149;
-}
-.btn-outline-danger:hover {
-    background-color: #da3633;
-    color: #fff;
+/* MODALS (Ventanas Emergentes) - CORRECCIÓN */
+.modal-content {
+    background-color: #161b22; /* Fondo oscuro */
+    border: 1px solid #30363d;
+    color: #c9d1d9; /* Texto claro */
 }
 
+.modal-header, .modal-footer {
+    border-color: #30363d;
+}
 
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%); /* Hace la X de cerrar blanca */
+}
+
+/* ESTILO DE CÓDIGO (Para que 'scrypt' no se vea rojo feo) */
+code {
+    color: #ff7b72; /* Rojo suave estilo código */
+    background-color: rgba(110, 118, 129, 0.4); /* Fondo grisaseo */
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* LINKS EN EL FOOTER */
+footer a {
+    color: #58a6ff !important;
+    text-decoration: none;
+}
+footer a:hover {
+    text-decoration: underline;
+}

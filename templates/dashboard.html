@@ -1,52 +1,236 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
-    <h2>🔐 Bóveda de {{ name }}</h2>
-    <span class="badge bg-success">Sistema Seguro Activo</span>
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3 border-bottom border-secondary pb-3">
+    <div>
+        <h2>🔐 Bóveda de {{ name }}</h2>
+        <span class="badge bg-success">Sistema Seguro Activo</span>
+    </div>
+    <button type="button" class="btn btn-outline-info shadow" data-bs-toggle="modal" data-bs-target="#exportModal">
+        ⬇️ Descargar Backup Seguro
+    </button>
 </div>
 
-<div class="card bg-dark text-white border-secondary mb-5 shadow">
-    <div class="card-header border-secondary">➕ Nuevo Registro Seguro</div>
+<div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark border-info text-white">
+            <div class="modal-header border-info">
+                <h5 class="modal-title text-info">⬇️ Exportar Bóveda Encriptada</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('export_vault') }}" method="POST">
+                <div class="modal-body">
+                    <p class="small text-muted">
+                        Tus credenciales serán empaquetadas y cifradas con <strong>AES-256</strong>. 
+                        Nadie, ni el administrador del sistema, podrá leer el archivo descargado sin esta contraseña.
+                    </p>
+                    <div class="mb-3">
+                        <label>Contraseña de Cifrado (¡No la olvides!)</label>
+                        <input type="password" name="export_password" class="form-control bg-dark text-white border-secondary" required placeholder="Crea una llave para tu archivo...">
+                    </div>
+                </div>
+                <div class="modal-footer border-info">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-info fw-bold">Descargar Archivo .ENC</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card bg-dark border-secondary mb-4 shadow">
     <div class="card-body">
-        <form method="POST">
-            <div class="mb-3">
-                <input type="text" name="title" class="form-control bg-secondary text-white border-0" placeholder="Título (ej. Clave Bancaria)" required>
+        <form method="POST" class="row g-3 align-items-center">
+            <div class="col-md-3">
+                <input type="text" name="title" class="form-control" placeholder="Plataforma (Ej. GitHub)" required>
             </div>
-            <div class="mb-3">
-                <textarea name="content" class="form-control bg-secondary text-white border-0" rows="3" placeholder="Escribe tu información confidencial aquí..." required></textarea>
+            <div class="col-md-7">
+                <div class="input-group">
+                    <input type="password" name="content" id="secretContent" class="form-control border-secondary bg-dark text-white" placeholder="Contraseña o secreto..." required>
+                    <button class="btn btn-outline-secondary" type="button" id="toggleVisibilityBtn" onclick="toggleInputVisibility()" title="Mostrar/Ocultar contraseña">👁️</button>
+                    <button type="button" class="btn btn-outline-warning fw-bold" data-bs-toggle="modal" data-bs-target="#generatorModal" title="Generador Avanzado">🎲</button>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary">🔒 Encriptar y Guardar</button>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary">➕ Guardar</button>
+            </div>
         </form>
     </div>
 </div>
 
-<h4 class="mb-3 border-bottom pb-2">Mis Archivos Clasificados</h4>
+<h4 class="mb-3 border-bottom border-secondary pb-2">Mis Credenciales</h4>
 
-<div class="row">
-    {% for secret in secrets %}
-    <div class="col-md-6 mb-4">
-        <div class="card h-100 shadow-sm border-danger"> <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                <strong class="text-danger">📂 {{ secret.title }}</strong>
-                <span class="badge bg-secondary">ID: {{ secret.id }}</span>
+<div class="table-responsive">
+    <table class="table table-dark table-hover align-middle border-secondary">
+        <thead>
+            <tr>
+                <th scope="col" style="width: 25%;">Plataforma</th>
+                <th scope="col" style="width: 45%;">Credencial</th>
+                <th scope="col" style="width: 30%;" class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for secret in secrets %}
+            <tr>
+                <td><strong>{{ secret.title }}</strong></td>
+                <td>
+                    <span class="secret-text" id="secret-{{ secret.id }}" style="filter: blur(6px); transition: 0.3s; user-select: none;">
+                        {{ secret.content }}
+                    </span>
+                    <input type="hidden" id="raw-{{ secret.id }}" value="{{ secret.content }}">
+                </td>
+                <td class="text-end">
+                    <button onclick="toggleSecret({{ secret.id }})" class="btn btn-sm btn-outline-info me-1" title="Revelar">👁️</button>
+                    <button onclick="copySecret({{ secret.id }})" class="btn btn-sm btn-outline-success me-1" title="Copiar al portapapeles">📋</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning me-1" data-bs-toggle="modal" data-bs-target="#editModal{{ secret.id }}" title="Editar">✏️</button>
+                    <form action="{{ url_for('delete_secret', id=secret.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Destruir credencial permanentemente?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+
+            <div class="modal fade" id="editModal{{ secret.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content bg-dark border-secondary">
+                    <div class="modal-header border-secondary">
+                      <h5 class="modal-title text-white">Editar Credencial</h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="{{ url_for('edit_secret', id=secret.id) }}" method="POST">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="text-white">Plataforma</label>
+                                <input type="text" name="title" class="form-control" value="{{ secret.title }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="text-white">Nueva Contraseña</label>
+                                <input type="text" name="content" class="form-control" value="{{ secret.content }}" required>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-warning">Actualizar Guardado</button>
+                        </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            {% else %}
+            <tr>
+                <td colspan="3" class="text-center text-muted py-4">La bóveda está vacía.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="generatorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning">🎲 Generador Criptográfico</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="card-body">
-                <p class="card-text" style="font-family: monospace;">{{ secret.content }}</p>
+            <div class="modal-body">
+                <input type="text" id="generatedPasswordDisplay" class="form-control text-center mb-4 fs-4 fw-bold text-success bg-black border-dark" readonly>
+                
+                <div class="mb-3">
+                    <label class="form-label">Longitud: <span id="lengthValue" class="text-warning fw-bold">16</span> caracteres</label>
+                    <input type="range" class="form-range" id="passLength" min="8" max="64" value="16" oninput="updateLength(this.value)">
+                </div>
+                
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="incUppercase" checked onchange="generateInModal()">
+                    <label class="form-check-label">Mayúsculas (A-Z)</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="incNumbers" checked onchange="generateInModal()">
+                    <label class="form-check-label">Números (0-9)</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="incSymbols" checked onchange="generateInModal()">
+                    <label class="form-check-label">Símbolos Especiales (!@#$%...)</label>
+                </div>
             </div>
-            <div class="card-footer bg-transparent border-top-0 text-end">
-                <form action="{{ url_for('delete_secret', id=secret.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de destruir este documento?');">
-                    <button type="submit" class="btn btn-outline-danger btn-sm">🗑️ Destruir</button>
-                </form>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" onclick="generateInModal()">🔄 Regenerar</button>
+                <button type="button" class="btn btn-warning fw-bold" onclick="applyGeneratedPassword()" data-bs-dismiss="modal">Usar esta Contraseña</button>
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="col-12 text-center mt-5">
-        <h5 class="text-muted">La bóveda está vacía.</h5>
-    </div>
-    {% endfor %}
 </div>
+
+<script>
+    // 1. Mostrar/Ocultar lo que el usuario escribe (El Ojito)
+    function toggleInputVisibility() {
+        const input = document.getElementById('secretContent');
+        if (input.type === 'password') {
+            input.type = 'text';
+        } else {
+            input.type = 'password';
+        }
+    }
+
+    // 2. Funciones de la tabla (Difuminar y Copiar)
+    function toggleSecret(id) {
+        const secretSpan = document.getElementById(`secret-${id}`);
+        if (secretSpan.style.filter === 'blur(6px)') {
+            secretSpan.style.filter = 'none';
+            secretSpan.style.userSelect = 'text';
+        } else {
+            secretSpan.style.filter = 'blur(6px)';
+            secretSpan.style.userSelect = 'none';
+        }
+    }
+
+    function copySecret(id) {
+        const rawValue = document.getElementById(`raw-${id}`).value;
+        navigator.clipboard.writeText(rawValue).then(() => {
+            alert('¡Copiado al portapapeles de forma segura! 📋');
+        });
+    }
+
+    // 3. Lógica del Generador Avanzado
+    function updateLength(val) {
+        document.getElementById('lengthValue').innerText = val;
+        generateInModal();
+    }
+
+    function generateInModal() {
+        const length = document.getElementById('passLength').value;
+        const hasUpper = document.getElementById('incUppercase').checked;
+        const hasNums = document.getElementById('incNumbers').checked;
+        const hasSyms = document.getElementById('incSymbols').checked;
+
+        // Construir el set de caracteres basado en lo que elija el usuario
+        let charset = "abcdefghijklmnopqrstuvwxyz"; // Minúsculas siempre activas
+        if (hasUpper) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        if (hasNums) charset += "0123456789";
+        if (hasSyms) charset += "!@#$%^&*()_+~|}{[]:;?><,./-=";
+
+        let password = "";
+        const randomValues = new Uint32Array(length);
+        window.crypto.getRandomValues(randomValues); // API Segura
+        
+        for (let i = 0; i < length; i++) {
+            password += charset[randomValues[i] % charset.length];
+        }
+        
+        document.getElementById('generatedPasswordDisplay').value = password;
+    }
+
+    // Autogenerar una contraseña en cuanto se abre la ventanita
+    document.getElementById('generatorModal').addEventListener('show.bs.modal', function () {
+        generateInModal();
+    });
+
+    // Pasar la contraseña generada al formulario de guardar
+    function applyGeneratedPassword() {
+        const pwd = document.getElementById('generatedPasswordDisplay').value;
+        const targetInput = document.getElementById('secretContent');
+        targetInput.value = pwd;
+        targetInput.type = "text"; // La dejamos visible para que vea qué guardará
+    }
+</script>
 {% endblock %}
-
-
 
