@@ -30,7 +30,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # CONFIGURACIÓN
-app.config['SECRET_KEY'] = 'una_clave_muy_secreta_temporal' 
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32)) 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///boveda.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -501,4 +501,4 @@ def ratelimit_handler(e):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=False)
