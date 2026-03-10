@@ -1,27 +1,141 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6">
-        <div class="card bg-secondary text-white">
-            <div class="card-header"><h3>Crear Cuenta</h3></div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label>Usuario</label>
-                        <input type="text" name="username" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label>Contraseña</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100">Registrarme</button>
-                </form>
+<div class="row justify-content-center mt-4">
+    <div class="col-md-5">
+        
+        {% if success %}
+        <div class="glass-card p-4 p-md-5 text-center text-light mt-5 border-success">
+            <h3 class="fw-bold text-success mb-3">¡Operación Exitosa!</h3>
+            
+            {% if is_recovery %}
+                <p class="text-warning small mb-3">Tu contraseña ha sido restablecida. Se ha generado un NUEVO Kit de Rescate.</p>
+            {% else %}
+                <p class="text-secondary mb-3">Agente <strong class="text-info">{{ username }}</strong>, tu bóveda criptográfica está lista.</p>
+            {% endif %}
+
+            <div class="alert alert-danger text-start small border-danger bg-dark bg-opacity-50 shadow-sm mb-4">
+                <strong>⚠️ CRÍTICO - ZERO KNOWLEDGE:</strong> Se ha descargado automáticamente un archivo <code>.txt</code> en tu computadora.<br><br>
+                Contiene tu <strong>Código de Rescate</strong> de 64 caracteres. Guárdalo en una USB (Air-Gapped). Si olvidas tu contraseña y pierdes este archivo, <u>ni siquiera nosotros podremos recuperar tus datos</u>.
             </div>
+
+            <a href="{{ url_for('login') }}" class="btn btn-info w-100 py-2 fw-bold text-dark shadow">Entendido, Proceder al Acceso</a>
         </div>
+
+        <script>
+            window.onload = function() {
+                const username = "{{ username }}";
+                const recoveryCode = "{{ recovery_code }}";
+                const fileContent = `=== KIT DE RESCATE DE LA BÓVEDA ===\nAgente: ${username}\nFecha de Emisión: ${new Date().toLocaleString()}\n\nCODIGO DE EMERGENCIA:\n${recoveryCode}\n\nINSTRUCCIONES:\n1. Si olvidas tu contraseña, ve a 'Olvidé mi contraseña' en la pantalla de inicio.\n2. Pega el código de arriba exactamente como está.\n3. ADVERTENCIA: Usar este código purgará todas tus contraseñas actuales por diseño de seguridad (Zero-Knowledge).`;
+                
+                const blob = new Blob([fileContent], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `KIT_RESCATE_BOVEDA_${username}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+        </script>
+        
+        {% else %}
+        <div class="glass-card p-4 p-md-5">
+            <h4 class="text-white fw-bold text-center mb-4">Registro de Usuario</h4>
+            
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label text-light small">Identificador (Usuario)</label>
+                    <input type="text" name="username" class="form-control text-white" required autofocus autocomplete="off" style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3);">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-light small">Contraseña Maestra</label>
+                    <div class="input-group">
+                        <input type="password" name="password" id="regPassword" class="form-control text-white" required onkeyup="checkEntropy()" 
+                               style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3); border-right: 0;">
+                        <button class="btn btn-outline-info" type="button" onclick="togglePass('regPassword')" 
+                                style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3); border-left: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
+                        </button>
+                    </div>
+                    <div class="progress mt-2" style="height: 6px; background-color: rgba(255,255,255,0.05);">
+                        <div id="entropyBar" class="progress-bar" style="width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <small id="entropyText" class="text-secondary d-block mt-1" style="font-size: 0.75rem;">Nivel de seguridad: Nulo</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-light small d-flex justify-content-between">
+                        Confirmar Contraseña <span id="matchStatus" class="fw-bold"></span>
+                    </label>
+                    <div class="input-group">
+                        <input type="password" name="confirm_password" id="regConfirm" class="form-control text-white" required onkeyup="checkEntropy()"
+                               style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3); border-right: 0;">
+                        <button class="btn btn-outline-info" type="button" onclick="togglePass('regConfirm')"
+                                style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3); border-left: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn btn-info w-100 py-2 fw-bold text-dark shadow" disabled>Crear Bóveda</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+{% if not success %}
+<script>
+    function togglePass(id) {
+        const input = document.getElementById(id);
+        input.type = (input.type === "password") ? "text" : "password";
+    }
+    // ... (El resto del script checkEntropy se mantiene igual) ...
+    function checkEntropy() {
+        const pwd = document.getElementById('regPassword').value;
+        const confirmPwd = document.getElementById('regConfirm').value;
+        const btn = document.getElementById('submitBtn');
+        const matchStatus = document.getElementById('matchStatus');
+        
+        let strength = 0;
+        if (pwd.length >= 8) strength += 20; 
+        if (pwd.match(/[A-Z]/)) strength += 20; 
+        if (pwd.match(/[a-z]/)) strength += 20; 
+        if (pwd.match(/[0-9]/)) strength += 20; 
+        if (pwd.match(/[^a-zA-Z0-9]/)) strength += 20; 
+
+        let bar = document.getElementById('entropyBar');
+        let text = document.getElementById('entropyText');
+        bar.style.width = strength + '%';
+
+        if (strength === 0) {
+            bar.className = 'progress-bar'; text.innerText = 'Nivel de seguridad: Nulo'; text.className = 'text-secondary d-block mt-1';
+        } else if (strength <= 40) {
+            bar.className = 'progress-bar bg-danger'; text.innerText = 'Nivel de seguridad: Débil'; text.className = 'text-danger d-block mt-1';
+        } else if (strength <= 80) {
+            bar.className = 'progress-bar bg-warning'; text.innerText = 'Nivel de seguridad: Moderado'; text.className = 'text-warning d-block mt-1';
+        } else {
+            bar.className = 'progress-bar bg-info'; text.innerText = 'Nivel de seguridad: Óptimo'; text.className = 'text-info d-block mt-1';
+        }
+
+        if (confirmPwd.length > 0) {
+            if (pwd === confirmPwd) {
+                matchStatus.innerHTML = "<span class='text-success'>Coinciden</span>";
+                if(strength >= 60) btn.disabled = false;
+            } else {
+                matchStatus.innerHTML = "<span class='text-danger'>No coinciden</span>";
+                btn.disabled = true;
+            }
+        } else {
+            matchStatus.innerHTML = "";
+            btn.disabled = true;
+        }
+    }
+</script>
+{% endif %}
 {% endblock %}
-
-
-

@@ -2,25 +2,47 @@
 
 {% block content %}
 <div class="row justify-content-center mt-5">
-    <div class="col-md-6">
-        <div class="card bg-secondary text-white">
-            <div class="card-header"><h3>Iniciar Sesión</h3></div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label>Usuario</label>
-                        <input type="text" name="username" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label>Contraseña</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Entrar</button>
-                </form>
+    <div class="col-md-4">
+        <div class="glass-card p-5 mt-4 border-info shadow-lg">
+            <div class="text-center mb-4">
+                <h3 class="text-white fw-bold mb-1">Bienvenido</h3>
+                <p class="text-muted small">Ingresa tus credenciales maestras</p>
             </div>
+            
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-floating mb-3">
+                    <input type="text" name="username" class="form-control text-white" id="floatingInput" placeholder="Usuario" required autofocus autocomplete="off" style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3);">
+                    <label for="floatingInput" class="text-muted">Nombre de Usuario</label>
+                </div>
+                
+                <div class="input-group mb-4">
+                    <div class="form-floating flex-grow-1">
+                        <input type="password" name="password" class="form-control text-white" id="loginPass" placeholder="Contraseña" required 
+                               style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3); border-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0;">
+                        <label for="loginPass" class="text-muted">Contraseña Maestra</label>
+                    </div>
+                    <button class="btn btn-outline-info" type="button" onclick="togglePass('loginPass')" 
+                            style="background: rgba(0,0,0,0.5); border-color: rgba(88, 166, 255, 0.3); border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
+                    </button>
+                </div>
+
+                <button type="submit" class="btn btn-info w-100 py-2 fw-bold text-dark shadow">Autenticar</button>
+
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('recover') }}" class="text-info small text-decoration-none hover-white">¿Olvidaste tu contraseña? (Usar Kit de Rescate)</a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
+<script>
+    function togglePass(id) {
+        const input = document.getElementById(id);
+        input.type = (input.type === "password") ? "text" : "password";
+    }
+</script>
 {% endblock %}
-
-

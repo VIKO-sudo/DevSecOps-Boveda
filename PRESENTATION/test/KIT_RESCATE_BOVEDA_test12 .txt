@@ -1,0 +1,11 @@
+=== KIT DE RESCATE DE LA BÓVEDA ===
+Agente: test12
+Fecha de Emisión: 20/2/2026, 10:21:23
+
+CODIGO DE EMERGENCIA:
+BOVEDA-90320C322E1A376996C45F72530578B7C78D762BCF259052D18D9417C156B645
+
+INSTRUCCIONES:
+1. Si olvidas tu contraseña, ve a 'Olvidé mi contraseña' en la pantalla de inicio.
+2. Pega el código de arriba exactamente como está.
+3. ADVERTENCIA: Usar este código purgará todas tus contraseñas actuales por diseño de seguridad (Zero-Knowledge).

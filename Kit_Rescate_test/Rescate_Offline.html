@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><title>Rescate de Bóveda</title>
+    <style>
+        body { background: #0d1117; color: #c9d1d9; font-family: 'Courier New', monospace; padding: 40px; margin: 0; }
+        .box { border: 1px solid #30363d; padding: 30px; background: #161b22; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        input, button { width: 100%; margin: 10px 0; padding: 12px; background: #0d1117; color: #58a6ff; border: 1px solid #30363d; box-sizing: border-box; border-radius: 6px; }
+        button { background: #238636; color: white; cursor: pointer; font-weight: bold; border: none; }
+        button:hover { background: #2ea043; }
+    </style>
+</head>
+<body>
+    <div id="mainContainer">
+        <div class="box">
+            <h2 style="color:#58a6ff; text-align: center; margin-bottom: 20px;">🛡️ Desencriptador Offline</h2>
+            <p style="font-size: 14px; color: #8b949e;">1. Selecciona tu archivo <b>boveda_datos.enc</b></p>
+            <input type="file" id="fileInput">
+            <p style="font-size: 14px; color: #8b949e; margin-top: 15px;">2. Ingresa tu Contraseña de Cifrado</p>
+            <input type="password" id="passInput" placeholder="Contraseña...">
+            <button onclick="decrypt()" style="margin-top: 20px;">🔓 DESBLOQUEAR BÓVEDA</button>
+        </div>
+    </div>
+    
+    <script>
+        let intentosFallidos = 0;
+
+        // Función unificada que dibuja el panel idéntico para la verdad y la mentira
+        function mostrarBoveda(credenciales) {
+            let htmlContent = `
+            <div style="background-color: #050505; color: #c9d1d9; font-family: -apple-system, sans-serif; min-height: 100vh; padding: 50px; text-align: center; position: absolute; top: 0; left: 0; right: 0; z-index: 1000;">
+                <h2 style="color: #3fb950; font-weight: bold;">[+] Llave maestra aceptada</h2>
+                <p style="color: #888;">Bloque AES-256 desencriptado correctamente.</p>
+                
+                <div style="max-width: 600px; margin: 40px auto; background: rgba(22,27,34,0.8); border: 1px solid #30363d; border-radius: 10px; padding: 30px; text-align: left; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+                    <h4 style="color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 20px; text-align: center;">--- BÓVEDA DESENCRIPTADA ---</h4>
+            `;
+            
+            // Recorre los datos (reales o falsos) y los inyecta en el diseño
+            credenciales.forEach(item => {
+                let titulo = item.title || item.Plataforma;
+                let pass = item.content || item.Credencial;
+                htmlContent += `<p><strong style="color: #fff;">${titulo}</strong> <span style="float: right; color: #3fb950; font-family: monospace; font-size: 16px;">${pass}</span></p>`;
+            });
+
+            htmlContent += `
+                    <p style="color: #8b949e; margin-top: 30px; border-top: 1px solid #30363d; padding-top: 15px; text-align: center; font-size: 12px;">[!] Fin de los registros. Cierra esta ventana por seguridad.</p>
+                </div>
+            </div>
+            `;
+            
+            // Reemplaza toda la pantalla con el resultado
+            document.body.innerHTML = htmlContent;
+        }
+
+        function activarHoneypot() {
+            // Generamos la lista de mentiras con la misma estructura JSON que la real
+            const credencialesFalsas = [
+                { Plataforma: "Facebook", Credencial: "okjsdbgihaieg" },
+                { Plataforma: "Gmail", Credencial: "password12345" },
+                { Plataforma: "Instagram", Credencial: "ihsaefjife" },
+                { Plataforma: "Netflix", Credencial: "123456789987654" },
+                { Plataforma: "PayPal", Credencial: "adminiegojgwpfips" }
+            ];
+            // Llamamos al panel de éxito pasándole la mentira
+            mostrarBoveda(credencialesFalsas);
+        }
+
+        async function decrypt() {
+            const file = document.getElementById('fileInput').files[0];
+            const password = document.getElementById('passInput').value;
+            
+            if (!file || !password) { 
+                alert("Falta archivo o contraseña."); 
+                return; 
+            }
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const data = new Uint8Array(arrayBuffer);
+                
+                const salt = data.slice(0, 16);
+                const iv = data.slice(16, 28);
+                const ciphertext = data.slice(28);
+                
+                const passKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), {name: "PBKDF2"}, false, ["deriveKey"]);
+                const aesKey = await crypto.subtle.deriveKey(
+                    { name: "PBKDF2", salt: salt, iterations: 600000, hash: "SHA-256" },
+                    passKey, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+                );
+                
+                const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, aesKey, ciphertext);
+                const json = JSON.parse(new TextDecoder().decode(decrypted));
+                
+                // ÉXITO REAL: Mandar los datos de verdad
+                intentosFallidos = 0;
+                mostrarBoveda(json);
+                
+            } catch (error) {
+                // FALLO: Sumar al contador en secreto
+                intentosFallidos++;
+                
+                if (intentosFallidos >= 3) {
+                    // Activar el engaño
+                    activarHoneypot();
+                } else {
+                    // Mensaje genérico sin revelar cuántos intentos lleva
+                    alert("ERROR: Contraseña incorrecta o archivo corrupto.");
+                    document.getElementById('passInput').value = ''; // Limpiar el campo para que vuelva a intentar
+                }
+            }
+        }
+    </script>
+</body>
+</html>

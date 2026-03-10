@@ -1,11 +1,23 @@
+# Entornos y Caché
 venv/
 __pycache__/
+*.pyc
+
+# Base de datos y Logs
 instance/
 *.db
 logs/
+
+# Secretos y Backups
 .env
 *.enc
 *.zip
-.DS_Store
 
+# Archivos de Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# INTUSOS (Instaladores y carpetas ajenas)
+*.exe
+Git/
 

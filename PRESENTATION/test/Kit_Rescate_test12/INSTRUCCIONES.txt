@@ -1,0 +1,9 @@
+=== KIT DE RESCATE OFFLINE: BÓVEDA DE test12 ===
+
+Tus credenciales están encriptadas con grado militar (AES-256) en el archivo .enc adjunto.
+
+CÓMO VER TUS CONTRASEÑAS SIN INTERNET:
+1. Da doble clic sobre el archivo 'Rescate_Offline.html' para abrirlo en tu navegador.
+2. Selecciona tu archivo 'boveda_datos.enc' dando clic en el botón.
+3. Ingresa la contraseña de cifrado que creaste al exportar tu bóveda.
+

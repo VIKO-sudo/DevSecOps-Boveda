@@ -1,75 +1,54 @@
-# 🛡️ DevSecOps Vault - Gestor de Secretos Seguro
+# DevSecOps Vault - Arquitectura Zero-Knowledge
 
-Sistema de gestión de información confidencial desarrollado bajo la metodología **DevSecOps**, integrando seguridad desde el diseño, auditoría continua y despliegue automatizado.
+Plataforma de gestión de secretos y credenciales desarrollada bajo la metodología **DevSecOps**, integrando seguridad ofensiva y defensiva desde el diseño (Security by Design).
 
 ![Estado de Seguridad](https://github.com/VIKO-sudo/DevSecOps-Boveda/actions/workflows/security.yml/badge.svg)
 
-## 🚀 Características de Seguridad Implementadas
+##Arquitectura de Seguridad Implementada
 
-Este proyecto cumple con los estándares de seguridad OWASP y las mejores prácticas de desarrollo seguro:
+Este proyecto supera las validaciones estándar e implementa defensas contra vectores de ataque del mundo real:
 
-### 1. 🔐 Seguridad de Aplicación (AppSec)
-* **Rate Limiting (Anti-DoS):** Protección contra ataques de fuerza bruta y denegación de servicio. Límite de 5 intentos por minuto en login.
-* **Gestión de Sesiones:** Uso de `Flask-Login` con protección de cookies segura.
-* **Hashing de Contraseñas:** Algoritmo `scrypt` para almacenamiento irreversible de credenciales.
-* **Control de Acceso (RBAC):** Prevención de vulnerabilidades IDOR. Los usuarios solo pueden acceder y borrar sus propios datos.
+### 1. Criptografía y Protección de Datos (Data at Rest)
+* **Zero-Knowledge Database:** Implementación de **AES-256 (Fernet)**. La base de datos local (`SQLite`) almacena los secretos cifrados de forma transparente (TDE). Si la BD es exfiltrada, los datos son matemáticamente ilegibles.
+* **Derivación de Claves (Key Stretching):** El sistema de exportación de respaldos utiliza **PBKDF2 con 600,000 iteraciones** y `Salt` aleatoria para mitigar ataques de fuerza bruta offline mediante GPU.
 
-### 2. 👁️ Auditoría y Monitoreo
-* **Sistema de Logs Forenses:** Registro inmutable de eventos críticos (Login, Registro, Creación/Eliminación de secretos) en `logs/audit.log`.
-* **Alertas de Intrusión:** Detección y registro de intentos de acceso no autorizados.
+### 2.Gestión de Identidad y Acceso (IAM)
+* **Autenticación Multi-Factor (MFA):** Implementación de **TOTP (Time-Based One-Time Password)** RFC 6238. Soporte nativo para Google Authenticator y Authy.
+* **Bloqueo de Cuenta (Account Lockout):** Defensa activa contra fuerza bruta online. Congelamiento automático de cuentas tras 5 intentos fallidos.
+* **Políticas de Contraseña:** Validación estricta mediante Expresiones Regulares (Regex) exigiendo complejidad alfanumérica y mayúsculas.
 
-### 3. 🤖 Pipeline CI/CD Seguro (DevSecOps)
-* **Análisis Estático (SAST):** Integración de **Bandit** en GitHub Actions.
-* **Automated Security Gate:** El pipeline bloquea automáticamente cualquier commit que contenga vulnerabilidades de seguridad (como modo debug activo o secretos hardcodeados).
-
----
-
-## 🛠️ Instalación y Despliegue Local
-
-Sigue estos pasos para levantar el entorno seguro en tu máquina:
-
-### Prerrequisitos
-* Python 3.10+
-* Git
-
-### Pasos
-1.  **Clonar el repositorio:**
-    ```bash
-    git clone [https://github.com/VIKO-sudo/DevSecOps-Boveda.git](https://github.com/VIKO-sudo/DevSecOps-Boveda.git)
-    cd DevSecOps-Boveda
-    ```
-
-2.  **Crear entorno virtual (Sandbox):**
-    ```bash
-    python -m venv venv
-    .\venv\Scripts\activate
-    ```
-
-3.  **Instalar dependencias:**
-    ```bash
-    pip install flask flask-sqlalchemy flask-login flask-wtf flask-limiter email_validator
-    ```
-
-4.  **Iniciar el Servidor Seguro:**
-    ```bash
-    python app.py
-    ```
-
-5.  **Acceso:**
-    Abrir navegador en `http://127.0.0.1:5000`
+### 3.Auditoría y Pipeline DevSecOps
+* **Trazabilidad Forense:** Registro inmutable de eventos críticos (Login, 2FA, Exportaciones) en archivos de log.
+* **Rate Limiting:** Mitigación de ataques de Denegación de Servicio (DoS) limitando peticiones por IP.
+* **Análisis Estático (SAST):** Pipeline CI/CD integrado con **GitHub Actions y Bandit** para bloquear despliegues con vulnerabilidades en el código fuente.
 
 ---
 
-## 📋 Lista de Tareas (Roadmap)
+## Guía de Despliegue (Instalación Rápida)
 
-- [x] Arquitectura Base (MVC)
-- [x] Base de Datos SQLite
-- [x] Pipeline CI/CD con Bandit
-- [x] Sistema de Logs
-- [x] Protección contra Fuerza Bruta (Rate Limit)
-- [ ] Encriptación de Datos en Reposo (AES-256)
-- [ ] Implementación de HTTPS (TLS)
+Para levantar el entorno seguro en una máquina limpia, ejecutar los siguientes comandos:
 
----
-**Desarrollado por:** Víctor Fernández (VIKO-sudo)
-*Proyecto académico de DevSecOps*
+```bash
+# 1. Clonar el repositorio
+git clone [https://github.com/VIKO-sudo/DevSecOps-Boveda.git](https://github.com/VIKO-sudo/DevSecOps-Boveda.git)
+cd DevSecOps-Boveda
+
+# 2. Crear y activar el entorno virtual aislado (Sandbox)
+python -m venv venv
+# En Windows:
+.\venv\Scripts\activate
+# En Linux/Mac:
+# source venv/bin/activate
+
+# 3. Instalar dependencias exactas
+pip install -r requirements.txt
+
+# 4. Configurar la Llave Maestra (CRÍTICO)
+# Crear un archivo llamado .env en la raíz y agregar una clave Fernet válida:
+# FERNET_KEY=TuClaveGeneradaAqui=
+
+# 5. Iniciar el Servidor Seguro
+python app.py
+
+Acceso local: http://127.0.0.1:5000
+

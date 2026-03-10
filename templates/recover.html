@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5">
+        <div class="glass-card p-4 p-md-5 mt-2 border-danger shadow-lg">
+            <div class="text-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="#f85149" class="mb-3" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
+                </svg>
+                <h4 class="text-danger fw-bold mb-1">Protocolo de Rescate</h4>
+                <p class="text-muted small">Requiere el Código de Rescate (64 caracteres)</p>
+            </div>
+            
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-floating mb-3">
+                    <input type="text" name="username" class="form-control" id="floatUser" placeholder="Usuario" required autocomplete="off">
+                    <label for="floatUser" class="text-muted">Nombre de Usuario (Alias)</label>
+                </div>
+                
+                <div class="form-floating mb-3">
+                    <input type="text" name="recovery_code" class="form-control text-warning" id="floatCode" placeholder="BOVEDA-..." required style="letter-spacing: 1px; font-family: monospace;">
+                    <label for="floatCode" class="text-muted">Código de Rescate (.txt)</label>
+                </div>
+
+                <div class="form-floating mb-4">
+                    <input type="password" name="new_password" class="form-control border-danger" id="floatPass" placeholder="Nueva Contraseña" required>
+                    <label for="floatPass" class="text-muted">Nueva Contraseña Maestra</label>
+                </div>
+
+                <button type="submit" class="btn btn-danger w-100 py-2 fw-bold shadow">Verificar y Resetear Bóveda</button>
+            </form>
+            <div class="text-center mt-4">
+                <a href="{{ url_for('login') }}" class="text-secondary small text-decoration-none">Cancelar y volver al Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

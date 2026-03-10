@@ -15,11 +15,13 @@ import json
 import io
 import zipfile
 import re
+import secrets
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from flask_wtf.csrf import CSRFProtect
 
 # 1. Cargar variables ocultas
 load_dotenv()
@@ -31,6 +33,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'una_clave_muy_secreta_temporal' 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///boveda.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+csrf = CSRFProtect(app)
 
 # --- MOTOR DE CIFRADO DE BASE DE DATOS (ENCRYPTION AT REST) ---
 ENCRYPTION_KEY = os.getenv('FERNET_KEY')
@@ -77,6 +81,16 @@ class User(UserMixin, db.Model):
     totp_secret = db.Column(db.String(32), nullable=True)
     is_mfa_enabled = db.Column(db.Boolean, default=False)
 
+    # --- PREPARACIÓN PARA 2FA/MFA ---
+    totp_secret = db.Column(db.String(32), nullable=True)
+    is_mfa_enabled = db.Column(db.Boolean, default=False)
+    
+    
+    # --- NUEVO: ONBOARDING Y RECUPERACIÓN ---
+    has_seen_tutorial = db.Column(db.Boolean, default=False)
+    recovery_hash = db.Column(db.String(255), nullable=True) 
+
+
 class Secret(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
@@ -100,27 +114,74 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
         
-        # VALIDACIÓN REGEX: Min 8 chars, 1 mayúscula, 1 minúscula, 1 número
+        if password != confirm_password:
+            flash('Error: Las contraseñas no coinciden.')
+            return redirect(url_for('register'))
+        
         if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$', password):
             flash('La contraseña debe tener mínimo 8 caracteres, incluir una mayúscula, una minúscula y un número.')
             return redirect(url_for('register'))
 
         user = User.query.filter_by(username=username).first()
         if user:
-            flash('Error en el registro. Verifique sus datos.') # OpSec: Evitamos confirmación de usuario
+            flash('Error en el registro. El Identificador no está disponible.')
             logging.warning(f'Intento de registro fallido: Usuario {username} ya existe.')
             return redirect(url_for('register'))
+                
+        # 1. Generar Código de Rescate (64 caracteres hiper-seguros)
+        raw_recovery_code = f"BOVEDA-{secrets.token_hex(32).upper()}"
+        hashed_recovery = generate_password_hash(raw_recovery_code, method='scrypt')
         
-        new_user = User(username=username, password=generate_password_hash(password, method='scrypt'))
+        # 2. Guardar Usuario con su Hash de Rescate
+        new_user = User(username=username, password=generate_password_hash(password, method='scrypt'), recovery_hash=hashed_recovery)
         db.session.add(new_user)
-        db.session.commit()
         
-        logging.info(f'Nuevo usuario registrado: {username}')
-        flash('Cuenta creada. Ahora inicia sesión.')
-        return redirect(url_for('login'))
+        try:
+            db.session.commit()
+            logging.info(f'Nuevo usuario registrado: {username}')
+            # 3. Mandamos el raw_recovery_code a la pantalla de éxito
+            return render_template('register.html', success=True, username=username, recovery_code=raw_recovery_code)
+        except Exception as e:
+            db.session.rollback() 
+            flash('Hubo un error en la creación. Intenta de nuevo.')
+            return redirect(url_for('register'))
         
-    return render_template('register.html')
+    return render_template('register.html', success=False)
+
+@app.route('/recover', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def recover():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        recovery_code = request.form.get('recovery_code')
+        new_password = request.form.get('new_password')
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.recovery_hash and check_password_hash(user.recovery_hash, recovery_code):
+            if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$', new_password):
+                flash('La nueva contraseña no cumple con los requisitos de seguridad.')
+                return redirect(url_for('recover'))
+                
+            # Los datos se conservan. Solo actualizamos la contraseña maestra.
+            user.password = generate_password_hash(new_password, method='scrypt')
+            
+            # Invalidar el código de rescate usado y generar uno nuevo
+            new_recovery_code = f"BOVEDA-{secrets.token_hex(32).upper()}"
+            user.recovery_hash = generate_password_hash(new_recovery_code, method='scrypt')
+            
+            db.session.commit()
+            logging.warning(f'CONTRASEÑA RESETEADA CON ÉXITO PARA: {username}')
+            
+            flash('¡Contraseña restablecida con éxito! Tus datos están a salvo.')
+            return render_template('register.html', success=True, username=username, recovery_code=new_recovery_code, is_recovery=True)
+        else:
+            flash('Identificador o Código de Rescate inválidos.')
+            logging.warning(f'Intento fallido de recuperación para: {username}')
+            
+    return render_template('recover.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
@@ -188,8 +249,8 @@ def dashboard():
         new_secret = Secret(title=title, content=encrypted_content, user_id=current_user.id)
         db.session.add(new_secret)
         db.session.commit()
-        logging.info(f'Usuario {current_user.username} creó un secreto: {title}')
-        flash('¡Secreto guardado en bóveda cifrada!')
+        logging.info(f'Usuario {current_user.username} creó una credencial: {title}')
+        flash('¡Credencial guardada en bóveda cifrada!')
         
     # RECUPERACIÓN: Extraemos de la DB y desciframos en memoria RAM para mostrar
     user_secrets = Secret.query.filter_by(user_id=current_user.id).all()
@@ -233,18 +294,21 @@ def delete_secret(id):
 
     db.session.delete(secret)
     db.session.commit()
-    logging.info(f'Usuario {current_user.username} eliminó un secreto.')
-    flash('Secreto eliminado.')
+    logging.info(f'Usuario {current_user.username} eliminó una Credencial')
+    flash('Credencial eliminada.')
     return redirect(url_for('dashboard'))
 
 @app.route('/export', methods=['POST'])
 @login_required
 def export_vault():
     export_password = request.form.get('export_password')
-    if len(export_password) < 4:
-        flash('La contraseña debe tener al menos 4 caracteres.')
+    
+    # NUEVO: Misma rigurosidad que el registro (Regex)
+    if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$', export_password):
+        flash('La llave de cifrado debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número para ser segura contra fuerza bruta.')
         return redirect(url_for('dashboard'))
     
+    # 1. Recolectar datos    
     # Extraemos y desciframos la DB local para poder volver a cifrarla con la clave del usuario
     user_secrets = Secret.query.filter_by(user_id=current_user.id).all()
     secrets_list = []
@@ -286,12 +350,58 @@ button{background:#238636;color:white;cursor:pointer;font-weight:bold;}button:ho
 <button onclick="decrypt()">🔓 DESBLOQUEAR</button><div id="resultado"></div></div>
 <script>async function decrypt(){const file=document.getElementById('fileInput').files[0];const password=document.getElementById('passInput').value;const out=document.getElementById('resultado');if(!file||!password)return;try{const arrayBuffer=await file.arrayBuffer();const data=new Uint8Array(arrayBuffer);const salt=data.slice(0,16);const iv=data.slice(16,28);const ciphertext=data.slice(28);const passKey=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),{name:"PBKDF2"},false,["deriveKey"]);const aesKey=await crypto.subtle.deriveKey({name:"PBKDF2",salt:salt,iterations:600000,hash:"SHA-256"},passKey,{name:"AES-GCM",length:256},false,["decrypt"]);const decrypted=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv},aesKey,ciphertext);const json=JSON.parse(new TextDecoder().decode(decrypted));let html="<h3>✅ DATOS:</h3>\\n";json.forEach(item=>{html+=`📌 <b>${item.Plataforma}:</b> ${item.Credencial}\\n`;});out.innerHTML=html;out.style.display='block';}catch(e){alert("❌ Error.");}}</script></body></html>"""
 
-    txt_instrucciones = f"""KIT DE RESCATE - {current_user.username.upper()}\n===================\n1. Extrae el ZIP.\n2. Abre Rescate_Offline.html.\n3. Selecciona boveda_datos.enc y pon tu clave."""
 
+    # (Dentro de export_vault)
+    # --- 1. LAS INSTRUCCIONES ---
+    instrucciones = f"""=== KIT DE RESCATE OFFLINE: BÓVEDA DE {current_user.username} ===
+
+Tus credenciales están encriptadas con grado militar (AES-256) en el archivo .enc adjunto.
+
+CÓMO VER TUS CONTRASEÑAS SIN INTERNET:
+1. Da doble clic sobre el archivo 'Rescate_Offline.html' para abrirlo en tu navegador.
+2. Selecciona tu archivo 'boveda_datos.enc' dando clic en el botón.
+3. Ingresa la contraseña de cifrado que creaste al exportar tu bóveda.
+
+"""
+
+        # --- 2. EMPAQUETAR EL ZIP ---
+    import io
+    import zipfile
+        
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            
+            # 2a. Guardar la Bóveda Encriptada
+        zf.writestr('boveda_datos.enc', final_encrypted_data)
+            
+            # 2b. Guardar las Instrucciones .TXT
+        zf.writestr('INSTRUCCIONES.txt', instrucciones)
+            
+            # 2c. Leer el HTML de Rescate de tu computadora y meterlo al ZIP
+        try:
+            with open('Kit_Rescate_test/Rescate_Offline.html', 'r', encoding='utf-8') as f:
+                lector_html = f.read()
+            zf.writestr('Rescate_Offline.html', lector_html)
+        except FileNotFoundError:
+                # Seguro de fallo: Si no encuentra el archivo en tu PC, avisa.
+            logging.error("No se encontró Kit_Rescate_test/Rescate_Offline.html")
+            flash("Error: Falta el archivo de rescate en el servidor.")
+            return redirect(url_for('dashboard'))
+
+        # 3. Enviar el ZIP al usuario
+    memory_file.seek(0)
+    return send_file(
+        memory_file, 
+        as_attachment=True, 
+        download_name=f'Kit_Rescate_{current_user.username}.zip', 
+        mimetype='application/zip'
+    )
+
+            
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('boveda_datos.enc', final_encrypted_data)
-        zf.writestr('INSTRUCCIONES.txt', txt_instrucciones)
+        zf.writestr('INSTRUCCIONES.txt', instrucciones)
         zf.writestr('Rescate_Offline.html', html_hacker)
     
     memory_file.seek(0)
@@ -313,7 +423,7 @@ def setup_2fa():
             current_user.is_mfa_enabled = True
             db.session.commit()
             session.pop('temp_totp_secret', None) # Limpiamos la memoria
-            flash('¡Autenticación de Dos Factores activada con éxito! Nivel de seguridad al máximo. 🛡️')
+            flash('¡Autenticación de Dos Factores activada con éxito!')
             return redirect(url_for('dashboard'))
         else:
             flash('Código incorrecto. Asegúrate de leer bien los 6 dígitos.')
@@ -326,7 +436,7 @@ def setup_2fa():
     # Creamos el link estándar que entienden las apps de MFA
     totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.username, issuer_name="DevSecOps Vault")
     
-    # Dibujamos el QR en la memoria RAM y lo convertimos a texto Base64 para enviarlo al HTML
+    # QR en la memoria RAM y lo convertimos a texto Base64 para enviarlo al HTML
     import io
     qr = qrcode.make(totp_uri)
     buffered = io.BytesIO()
@@ -343,15 +453,15 @@ def login_2fa():
     
     if request.method == 'POST':
         token = request.form.get('token')
-        # --- VERSIÓN CORREGIDA PARA SQLALCHEMY 2.0 ---
+        # VERSIÓN CORREGIDA PARA SQLALCHEMY 2.0
         user = db.session.get(User, session['pending_user_id']) 
         
         totp = pyotp.TOTP(user.totp_secret)
-        # ... (el resto sigue igual)
+        #
         
         totp = pyotp.TOTP(user.totp_secret)
         if totp.verify(token):
-            # El código es correcto. Lo logueamos de verdad.
+            # 
             session.pop('pending_user_id', None)
             login_user(user)
             logging.info(f'Inicio de sesión 2FA exitoso: {user.username}')
@@ -361,8 +471,16 @@ def login_2fa():
             flash('Código 2FA incorrecto o expirado.')
             
     return render_template('login_2fa.html')
-@app.route('/logout')  # <--- ¡ESTA LÍNEA ES LA QUE TE FALTA!
-@login_required        # <--- Y ESTA TAMBIÉN (Para mayor seguridad)
+
+@app.route('/complete_tutorial', methods=['POST'])
+@login_required
+def complete_tutorial():
+    current_user.has_seen_tutorial = True
+    db.session.commit()
+    return '', 204 # Devuelve un OK silencioso (sin recargar la página)
+
+@app.route('/logout')  
+@login_required        # para mayor seguridad
 def logout():
     logout_user()
     flash('Has cerrado sesión.')
@@ -383,4 +501,4 @@ def ratelimit_handler(e):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=False)
+    app.run(debug=True)

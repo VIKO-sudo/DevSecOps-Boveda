@@ -18,6 +18,7 @@
                 <hr class="border-secondary mt-4">
                 
                 <form method="POST" class="mt-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <label class="form-label text-info">Ingresa el código de 6 dígitos para confirmar:</label>
                     <input type="text" name="token" class="form-control text-center fs-3 letter-spacing-3 bg-dark text-white border-secondary mx-auto" style="max-width: 200px; letter-spacing: 10px;" maxlength="6" required autocomplete="off" autofocus>
                     <button type="submit" class="btn btn-primary mt-4 w-100 fw-bold">Activar Protección MFA</button>
